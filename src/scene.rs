@@ -1,20 +1,13 @@
+use crate::material::generate_materials;
 use crate::{
-    animation::Animation,
-    camera::Camera,
-    light::Light,
-    material::Material,
-    mesh::Mesh,
-    metadata::MetaData,
-    node::Node,
-    sys::*,
-    *,
+    animation::Animation, camera::Camera, light::Light, material::Material, mesh::Mesh,
+    metadata::MetaData, node::Node, sys::*, *,
 };
 use std::{
     cell::RefCell,
     ffi::{CStr, CString},
     rc::Rc,
 };
-use crate::material::generate_materials;
 
 #[derive(Derivative)]
 #[derivative(Debug)]

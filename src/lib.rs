@@ -1,7 +1,15 @@
-#![crate_name = "russimp"]
-#![crate_type = "lib"]
+pub mod animation;
+pub mod bone;
+pub mod camera;
+pub mod face;
+pub mod light;
+pub mod material;
+pub mod mesh;
+pub mod metadata;
+pub mod node;
+pub mod scene;
 
-pub extern crate russimp_sys as sys;
+pub use russimp_sys as sys;
 
 #[cfg(feature = "mint")]
 mod impl_mint;
@@ -17,20 +25,6 @@ use std::{
     str::Utf8Error,
 };
 use sys::{aiAABB, aiColor3D, aiColor4D, aiMatrix4x4, aiVector2D, aiVector3D};
-
-#[macro_use]
-extern crate num_derive;
-
-pub mod animation;
-pub mod bone;
-pub mod camera;
-pub mod face;
-pub mod light;
-pub mod material;
-pub mod mesh;
-pub mod metadata;
-pub mod node;
-pub mod scene;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -208,7 +202,7 @@ impl Into<RussimpError> for IntoStringError {
 
 pub type Russult<T> = Result<T, RussimpError>;
 
-mod utils {
+pub mod utils {
     use std::{os::raw::c_uint, ptr::slice_from_raw_parts};
 
     pub(crate) fn get_base_type_vec_from_raw<'a, TRaw: 'a>(

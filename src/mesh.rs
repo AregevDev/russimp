@@ -1,5 +1,7 @@
 use crate::{bone::Bone, face::Face, sys::*, *};
 use derivative::Derivative;
+use num_derive::FromPrimitive;
+use num_derive::ToPrimitive;
 use num_traits::ToPrimitive;
 use std::ops::{BitAnd, BitOr};
 

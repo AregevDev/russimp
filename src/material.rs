@@ -1,17 +1,24 @@
-use crate::{utils::get_base_type_vec_from_raw, sys::*, utils, RussimpError, Russult};
+use crate::{sys::*, utils, utils::get_base_type_vec_from_raw, RussimpError, Russult};
+
 use derivative::Derivative;
-use num_traits::FromPrimitive;
-use std::{collections::HashMap, cell::RefCell, mem::MaybeUninit, ptr::slice_from_raw_parts, ffi::CStr, path::Path, rc::Rc};
+use num_derive::FromPrimitive;
 use num_enum::TryFromPrimitive;
+use num_traits::FromPrimitive;
+use std::{
+    cell::RefCell, collections::HashMap, ffi::CStr, mem::MaybeUninit, path::Path,
+    ptr::slice_from_raw_parts, rc::Rc,
+};
+
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-const FILENAME_PROPERTY: &str = "$tex.file";
 const EMBEDDED_TEXNAME_PREFIX: &str = "*";
 
 pub(crate) type Filename = String;
 
-#[derive(Derivative, FromPrimitive, PartialEq, TryFromPrimitive, Clone, Eq, Hash, EnumIter, Copy)]
+#[derive(
+    Derivative, FromPrimitive, PartialEq, TryFromPrimitive, Clone, Eq, Hash, EnumIter, Copy,
+)]
 #[derivative(Debug)]
 #[repr(u32)]
 pub enum TextureType {
@@ -82,10 +89,10 @@ pub(crate) fn generate_materials(scene: &aiScene) -> Russult<Vec<Material>> {
     let properties = create_material_properties(&materials);
     let mut result = Vec::new();
 
-    let mut converted_textures : HashMap<usize, Rc<RefCell<Texture>>> = HashMap::new();
+    let mut converted_textures: HashMap<usize, Rc<RefCell<Texture>>> = HashMap::new();
 
     for (mat_index, &mat) in materials.iter().enumerate() {
-        let mut material_textures : HashMap<TextureType, Rc<RefCell<Texture>>> = HashMap::new();
+        let mut material_textures: HashMap<TextureType, Rc<RefCell<Texture>>> = HashMap::new();
 
         for tex_type in TextureType::iter() {
             let material_filenames = get_textures_of_type_from_material(mat, tex_type)?;
@@ -97,15 +104,22 @@ pub(crate) fn generate_materials(scene: &aiScene) -> Russult<Vec<Material>> {
                     if let Some(tex) = converted_textures.get(&embedded_texture) {
                         material_textures.insert(tex_type, tex.clone());
                     } else {
-                        let new_texture = create_texture_from(&textures[embedded_texture], true);
-                        converted_textures.insert(embedded_texture, Rc::new(RefCell::new(new_texture)));
-                        material_textures.insert(tex_type, converted_textures.get(&embedded_texture).unwrap().clone());
+                        let new_texture = create_texture_from(textures[embedded_texture], true);
+                        converted_textures
+                            .insert(embedded_texture, Rc::new(RefCell::new(new_texture)));
+                        material_textures.insert(
+                            tex_type,
+                            converted_textures.get(&embedded_texture).unwrap().clone(),
+                        );
                     }
                 }
             }
         }
 
-        result.push(Material::new(properties[mat_index].clone(), material_textures));
+        result.push(Material::new(
+            properties[mat_index].clone(),
+            material_textures,
+        ));
     }
 
     Ok(result)
@@ -155,7 +169,7 @@ fn get_texture_filename(
         )
     } == aiReturn_aiReturn_SUCCESS
     {
-        let filename : String = unsafe { path.assume_init() }.into();
+        let filename: String = unsafe { path.assume_init() }.into();
 
         return Ok(filename);
     }
@@ -164,14 +178,20 @@ fn get_texture_filename(
 }
 
 fn create_texture_from(texture: &aiTexture, is_embedded: bool) -> Texture {
-    let ach_format_hint = unsafe { CStr::from_ptr(texture.achFormatHint.as_ptr()) }.to_str().unwrap().to_string();
+    let ach_format_hint = unsafe { CStr::from_ptr(texture.achFormatHint.as_ptr()) }
+        .to_str()
+        .unwrap()
+        .to_string();
 
     let data = if is_embedded {
         let compressed_bytes =
             slice_from_raw_parts(texture.pcData as *const u8, texture.mWidth as usize);
         DataContent::Bytes(unsafe { compressed_bytes.as_ref() }.unwrap().to_vec())
     } else {
-        DataContent::Texel(utils::get_vec(texture.pcData, texture.mWidth * texture.mHeight))
+        DataContent::Texel(utils::get_vec(
+            texture.pcData,
+            texture.mWidth * texture.mHeight,
+        ))
     };
 
     Texture {
@@ -183,8 +203,7 @@ fn create_texture_from(texture: &aiTexture, is_embedded: bool) -> Texture {
     }
 }
 
-
-fn get_embedded_texture(file_name: &String, textures: &Vec<&aiTexture>) -> Option<usize> {
+fn get_embedded_texture(file_name: &str, textures: &Vec<&aiTexture>) -> Option<usize> {
     if file_name.starts_with(EMBEDDED_TEXNAME_PREFIX) {
         let temp = file_name.split_at(1).1.to_string();
         let index = temp.parse::<usize>().unwrap();
@@ -195,10 +214,8 @@ fn get_embedded_texture(file_name: &String, textures: &Vec<&aiTexture>) -> Optio
         return Some(index);
     }
 
-    let path = Path::new(file_name.as_str());
-    if path.file_name().is_none() {
-        return None;
-    }
+    let path = Path::new(file_name);
+    path.file_name()?;
 
     for (tex_index, &texture) in textures.iter().enumerate() {
         let texture_filename: String = texture.mFilename.into();
@@ -234,7 +251,7 @@ fn get_properties(material: &aiMaterial) -> Vec<MaterialProperty> {
 
     for item in properties {
         let material_property = MaterialProperty::new(material, item);
-        result.push( material_property);
+        result.push(material_property);
     }
 
     result
@@ -248,7 +265,10 @@ pub struct Material {
 }
 
 impl Material {
-    fn new(properties: Vec<MaterialProperty>, textures: HashMap<TextureType, Rc<RefCell<Texture>>>) -> Self {
+    fn new(
+        properties: Vec<MaterialProperty>,
+        textures: HashMap<TextureType, Rc<RefCell<Texture>>>,
+    ) -> Self {
         Self {
             properties,
             textures,
@@ -353,10 +373,10 @@ impl<'a> MaterialPropertyCaster for FloatPropertyContent<'a> {
         let data_len = self.data.len();
         let mut max = data_len as u32
             / if *self.property_info & aiPropertyTypeInfo_aiPTI_Double > 0 {
-            8
-        } else {
-            4
-        };
+                8
+            } else {
+                4
+            };
         let result: Vec<f32> = vec![0.0; max as usize];
 
         if unsafe {
@@ -435,14 +455,14 @@ impl MaterialProperty {
                 key: &property.mKey,
                 index: property.mIndex,
                 c_type: property.mSemantic,
-                mat: &material,
+                mat: material,
                 property_info: &property.mType,
             }),
             Box::new(FloatPropertyContent {
                 key: &property.mKey,
                 index: property.mIndex,
                 c_type: property.mSemantic,
-                mat: &material,
+                mat: material,
                 property_info: &property.mType,
                 data,
             }),
@@ -450,7 +470,7 @@ impl MaterialProperty {
                 key: &property.mKey,
                 index: property.mIndex,
                 c_type: property.mSemantic,
-                mat: &material,
+                mat: material,
                 property_info: &property.mType,
                 data,
             }),
@@ -479,7 +499,7 @@ impl MaterialProperty {
             key: property.mKey.into(),
             data,
             index: property.mIndex as usize,
-            semantic: FromPrimitive::from_u32(property.mSemantic as u32).unwrap(),
+            semantic: FromPrimitive::from_u32(property.mSemantic).unwrap(),
         }
     }
 }
@@ -497,7 +517,7 @@ fn material_for_box() {
         box_file_path.as_str(),
         vec![PostProcess::ValidateDataStructure],
     )
-        .unwrap();
+    .unwrap();
 
     assert_eq!(1, scene.materials.len());
     assert_eq!(41, scene.materials[0].properties.len());
@@ -532,46 +552,57 @@ fn debug_material() {
 
     let scene = Scene::from_file(
         box_file_path.as_str(),
-        vec![
-            PostProcess::ValidateDataStructure,
-        ],
+        vec![PostProcess::ValidateDataStructure],
     )
-        .unwrap();
+    .unwrap();
 
     dbg!(&scene.materials);
 }
 
 #[test]
 fn filenames_available_for_textures() {
-    use crate::{
-        scene::{PostProcess, Scene},
-    };
+    const FILENAME_PROPERTY: &str = "$tex.file";
 
-    let current_directory_buf =
-        utils::get_model("models/GLTF2/BoxTextured-GLTF/BoxTextured.gltf");
+    use crate::scene::{PostProcess, Scene};
+    use std::iter::Filter;
+
+    let current_directory_buf = utils::get_model("models/GLTF2/BoxTextured-GLTF/BoxTextured.gltf");
 
     let scene = Scene::from_file(
         current_directory_buf.as_str(),
         vec![PostProcess::ValidateDataStructure],
     )
-        .unwrap();
+    .unwrap();
 
     assert_eq!(0, scene.materials[0].textures.len());
     assert_eq!(0, scene.materials[1].textures.len());
 
-    let properties_first_material : Vec<&MaterialProperty> = scene.materials[0].properties.iter().filter(|x| x.key.eq(&FILENAME_PROPERTY.to_string())).collect();
-    let properties_second_material : Vec<&MaterialProperty> = scene.materials[1].properties.iter().filter(|x| x.key.eq(&FILENAME_PROPERTY.to_string())).collect();
+    let properties_first_material: Vec<&MaterialProperty> = scene.materials[0]
+        .properties
+        .iter()
+        .filter(|x| x.key.as_str() == FILENAME_PROPERTY)
+        .collect();
+    let properties_second_material: Vec<&MaterialProperty> = Filter::collect(
+        scene.materials[1]
+            .properties
+            .iter()
+            .filter(|x| x.key.as_str() == FILENAME_PROPERTY),
+    );
 
-    assert!(properties_first_material.iter().any(|&x| x.semantic == TextureType::Diffuse));
-    assert!(properties_first_material.iter().any(|&x| x.semantic == TextureType::BaseColor));
+    assert!(properties_first_material
+        .iter()
+        .any(|&x| x.semantic == TextureType::Diffuse));
+    assert!(properties_first_material
+        .iter()
+        .any(|&x| x.semantic == TextureType::BaseColor));
     assert_eq!(0, properties_second_material.len())
 }
 
 #[test]
 fn read_embedded_texture_works_as_expected() {
     use crate::{
-        scene::{PostProcess, Scene},
         material::TextureType::*,
+        scene::{PostProcess, Scene},
     };
 
     let current_directory_buf =
@@ -589,6 +620,6 @@ fn read_embedded_texture_works_as_expected() {
 
     assert!(matches!(
         &temp.data,
-        DataContent::Bytes(x) if x.len() > 0
+        DataContent::Bytes(x) if !x.is_empty()
     ));
 }

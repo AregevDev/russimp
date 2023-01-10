@@ -2,7 +2,7 @@
 name = "russimp"
 version = "2.0.2"
 authors = ["Jhonny Knaak de Vargas"]
-edition = "2018"
+edition = "2021"
 license-file = "LICENSE"
 readme = "README.md"
 homepage = "https://github.com/jkvargas/russimp"

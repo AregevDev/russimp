@@ -1,4 +1,4 @@
-use crate::{sys::*, *};
+use crate::{sys::*, utils, Vector3D};
 use derivative::Derivative;
 
 #[derive(Derivative)]
